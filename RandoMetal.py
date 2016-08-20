@@ -144,7 +144,7 @@ def get_related_links(html):
     if raw_data is not None:
         url = str(raw_data['href'])
     else:
-        print "[!!] No related link for this band\n"
+        print ("[!!] No related link for this band\n")
         
     return url
 
