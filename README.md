@@ -2,6 +2,7 @@
 Simple python script to randomly play a metal music.
 
 [------------------------------------------------------------------]
+
 Make sure you have BeautifulSoup4, Selenium and Requests to work.
 
 If not, you can use the shell script to install them :
@@ -11,6 +12,7 @@ If not, you can use the shell script to install them :
 Then you can do : python RandoMetal.py
 
 Enjoy !
+
 [------------------------------------------------------------------]
 
 Python 2.7.6
