@@ -1,4 +1,4 @@
 # RandoMetal
 Simple script to randomly play a metal music.
 
-Need Bs4 and Selenium to work.
+Need Bs4, Selenium and Requests to work.
