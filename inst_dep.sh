@@ -2,9 +2,9 @@
 
 pip &>/dev/null
 
-if [ $? -eq 2 ]
+if [ $? -eq 127 ]
 then
-	apt-get install python-pip
+	sudo apt-get install python-pip
 fi
 
 packages=$(pip list)
@@ -16,6 +16,6 @@ do
 	test=$(echo "$packages" | grep "$dep")
 	if [ -z "$test" ]
 	then
-		pip install $dep
+		sudo pip install $dep
 	fi
 done
