@@ -1,6 +1,10 @@
 # RandoMetal
-Simple script to randomly play a metal music.
+Simple python script to randomly play a metal music.
 
-Need BeautifulSoup4, Selenium and Requests to work.
+Make sure you have BeautifulSoup4, Selenium and Requests to work.
+
+If not, you can use the shell script to install them :
+  - chmod u+x inst_dep.sh
+  - ./inst_dep.sh
 
 Python 2.7.6
