@@ -1,7 +1,6 @@
-##!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf8 -*-
 
-import os
 import sys
 import getopt
 import urllib
@@ -11,6 +10,7 @@ from bs4 import BeautifulSoup
 import requests
 
 URL_RANDOM = "http://www.metal-archives.com/band/random"
+glob_verbose = False
 
 def usage():
   print("     __                 _                   _        _ ")
@@ -23,8 +23,10 @@ def usage():
   print("    A little script to randomly play a song taken ")
   print("         from 'metal-archives.com' | Zar - 2016")
   print("|--------------------------------------------------------|")
-  print(" Option : ")
-  print("   -y [--youtube]: Try to find and play song only on Youtube.\n")
+  print(" Options : ")
+  print("  -y [--youtube] : Try to find and play song only on Youtube.")
+  print("  -n [--nbr]     : Set the number of band to search. One by default.")
+  print("  -v [--verbose] : Display more informations.")
 
 def clean_name(name):
   """ Clean the caracters who are not decoded.  """
@@ -142,7 +144,8 @@ def request_youtube(name, cd):
   else:
     query = name + "+-+" + cd
 
-  print("[*] Query : " + query.replace('+', ' '))
+  if glob_verbose:
+    print("[*] Query: " + query.replace('+', ' '))
 
   url_yt = YT_URL + query
   html_yt = requests.get(url_yt).content
@@ -155,26 +158,53 @@ def only_youtube(name, ide, first):
   Function who try to play the song.
   """
 
-  if first:
-    html = requests.get(URL_RANDOM).content
-    name, ide = get_name_id(html)
-    print("[#] Band: "+name+", ID: "+ide)
-
   cd = get_cd(ide)
   link = request_youtube(name, cd)
 
   if link is not None:
     yt_link = "https://www.youtube.com" + link
-    webbrowser.open(yt_link)
+    return yt_link
+    #webbrowser.open(yt_link)
 
+
+def find_band(only_yt):
+  """ Find url for one band and display it. """
+  
+  html = requests.get(URL_RANDOM).content
+  name, ide = get_name_id(html)
+  name = clean_name(name)
+
+  print("[#] Band: "+name+", ID: "+ide)
+  
+  if only_yt:
+    return only_youtube(name, ide, True)
+  else:
+    url = get_related_links(html)
+    html = requests.get(url).content
+    list_link = get_music_link(html, name)
+
+    link = None
+    if list_link:
+      link = chose_link(list_link)
+    
+    if link:
+      return link
+      #webbrowser.open(link)
+    else:
+      print("[!] No musical link for this band.\n    Trying on youtube.")
+      return only_youtube(name, ide, False)
 
 """
 Main
 """
 
 def main(argv):
+  
+  nbr = 1
+  only_yt = False
+  
   try:                                
-    opts, args = getopt.getopt(argv, "hy", ["help", "youtube"])
+    opts, args = getopt.getopt(argv, "hyvn:", ["help", "youtube", "verbose", "nbr"])
   except getopt.GetoptError:
     print("[!] Unhandled option.")
     usage()
@@ -185,32 +215,21 @@ def main(argv):
       usage()
       sys.exit() 
     elif opt in ("-y", "--youtube"):
-      only_youtube(name, ide, True)
-      sys.exit()
+      only_yt = True
+    elif opt in ("-v", "--verbose"):
+      glob_verbose = True
+    elif opt in ("-n", "--nbr"):
+      nbr = int(arg)
     else:
       print("[!] Unhandled option.")
       usage()
       sys.exit(2)
 
-  html = requests.get(URL_RANDOM).content
-  name, ide = get_name_id(html)
-  name = clean_name(name)
-
-  print("[#] Band: "+name+", ID: "+ide)
-
-  url = get_related_links(html)    
-  html = requests.get(url).content
-  list_link = get_music_link(html, name)
-
-  link = None
-  if list_link:
-    link = chose_link(list_link)
+  links = []
+  for i in range(nbr):
+    links.append(find_band(only_yt))
   
-  if link:
-    webbrowser.open(link)
-  else:
-    print("[!] No musical link for this band.\n    Trying on youtube.")
-    only_youtube(name, ide, False)
+  print(links)
 
 if __name__ == "__main__":
   main(sys.argv[1:])
