@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf8 -*-
 
 import sys
@@ -163,8 +162,8 @@ def only_youtube(name, ide, first):
 
   if link is not None:
     yt_link = "https://www.youtube.com" + link
+    webbrowser.open(yt_link)
     return yt_link
-    #webbrowser.open(yt_link)
 
 
 def find_band(only_yt):
@@ -188,8 +187,8 @@ def find_band(only_yt):
       link = chose_link(list_link)
     
     if link:
+      webbrowser.open(link)
       return link
-      #webbrowser.open(link)
     else:
       print("[!] No musical link for this band.\n    Trying on youtube.")
       return only_youtube(name, ide, False)
