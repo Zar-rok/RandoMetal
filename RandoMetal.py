@@ -8,8 +8,9 @@ import webbrowser
 from bs4 import BeautifulSoup
 import requests
 
-URL_RANDOM = "http://www.metal-archives.com/band/random"
+URL_RANDOM = "https://www.metal-archives.com/band/random"
 glob_verbose = False
+glob_print_page = False
 
 def usage():
   print("     __                 _                   _        _ ")
@@ -25,6 +26,7 @@ def usage():
   print(" Options : ")
   print("  -y [--youtube] : Try to find and play song only on Youtube.")
   print("  -n [--nbr]     : Set the number of band to search. One by default.")
+  print("  -p [--page]    : Open the archive-metal page of the band.")
   print("  -v [--verbose] : Display more informations.")
 
 def clean_name(name):
@@ -43,7 +45,7 @@ def get_name_id(html):
   raw_data = raw_data.find('a').get('href')
   raw_data = str(raw_data).split('/', 5)
   name = raw_data[4]
-  ide = raw_data[5] 
+  ide = raw_data[5]
 
   return name, ide
 
@@ -55,7 +57,7 @@ def get_cd(ide):
   cd = None
   raw_data  = []
   class_word = ["demo", "single", "album", "other"]
-  url_cd = "http://www.metal-archives.com/band/discography/id/"+str(ide)+"/tab/all"
+  url_cd = "https://www.metal-archives.com/band/discography/id/" + str(ide) + "/tab/all"
 
   html = requests.get(url_cd).content
   for i in range(len(class_word)):
@@ -173,7 +175,10 @@ def find_band(only_yt):
   name, ide = get_name_id(html)
   name = clean_name(name)
 
-  print("[#] Band: "+name+", ID: "+ide)
+  if glob_print_page:
+    webbrowser.open("https://www.metal-archives.com/bands/" + name + "/" + ide)
+
+  print("[#] Band: " + name + ", ID: " + ide)
   
   if only_yt:
     return only_youtube(name, ide, True)
@@ -202,9 +207,10 @@ def main(argv):
   nbr = 1
   only_yt = False
   global glob_verbose
+  global glob_print_page
   
   try:                                
-    opts, args = getopt.getopt(argv, "hyvn:", ["help", "youtube", "verbose", "nbr"])
+    opts, args = getopt.getopt(argv, "hyvpn:", ["help", "youtube", "verbose", "page", "nbr"])
   except getopt.GetoptError:
     print("[!] Unhandled option.")
     usage()
@@ -218,6 +224,8 @@ def main(argv):
       only_yt = True
     elif opt in ("-v", "--verbose"):
       glob_verbose = True
+    elif opt in ("-p", "--page"):
+      glob_print_page = True
     elif opt in ("-n", "--nbr"):
       nbr = int(arg)
     else:
@@ -228,8 +236,9 @@ def main(argv):
   links = []
   for i in range(nbr):
     links.append(find_band(only_yt))
-  
-  print(links)
+    if glob_verbose:
+      print("[*] Link : " + links[i])
+    print("    ====")
 
 if __name__ == "__main__":
   main(sys.argv[1:])
