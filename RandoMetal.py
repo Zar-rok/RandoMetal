@@ -135,14 +135,14 @@ def request_youtube(name, cd):
   """"
   Make a request to Youtube and return the first link.
   """
-
+  
   YT_URL = "https://www.youtube.com/results?search_query="
 
   if cd is None:
     query = name + "+metal+music"
   else:
     query = name + "+-+" + cd
-
+	
   if glob_verbose:
     print("[*] Query: " + query.replace('+', ' '))
 
@@ -201,6 +201,7 @@ def main(argv):
   
   nbr = 1
   only_yt = False
+  global glob_verbose
   
   try:                                
     opts, args = getopt.getopt(argv, "hyvn:", ["help", "youtube", "verbose", "nbr"])
