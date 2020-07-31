@@ -1,9 +1,10 @@
+#!/usr/bin/env python3
 # -*- coding: utf8 -*-
 
 import sys
-import getopt
 import urllib
 import webbrowser
+import argparse
 
 from bs4 import BeautifulSoup
 import requests
@@ -11,23 +12,6 @@ import requests
 URL_RANDOM = "https://www.metal-archives.com/band/random"
 glob_verbose = False
 glob_print_page = False
-
-def usage():
-  print("     __                 _                   _        _ ")
-  print("    /__\ __ _ _ __   __| | ___   /\/\   ___| |_ __ _| |")
-  print("   / \/// _` | '_ \ / _` |/ _ \ /    \ / _ \ __/ _` | |")
-  print("  / _  \ (_| | | | | (_| | (_) / /\/\ \  __/ || (_| | |")
-  print("  \/ \_/\__,_|_| |_|\__,_|\___/\/    \/\___|\__\__,_|_|")
-  print("")
-  print("|--------------------------------------------------------|")
-  print("    A little script to randomly play a song taken ")
-  print("         from 'metal-archives.com' | Zar - 2016")
-  print("|--------------------------------------------------------|")
-  print(" Options : ")
-  print("  -y [--youtube] : Try to find and play song only on Youtube.")
-  print("  -n [--nbr]     : Set the number of band to search. One by default.")
-  print("  -p [--page]    : Open the archive-metal page of the band.")
-  print("  -v [--verbose] : Display more informations.")
 
 def clean_name(name):
   """ Clean the caracters who are not decoded.  """
@@ -203,42 +187,33 @@ Main
 """
 
 def main(argv):
-  
-  nbr = 1
-  only_yt = False
-  global glob_verbose
-  global glob_print_page
-  
-  try:                                
-    opts, args = getopt.getopt(argv, "hyvpn:", ["help", "youtube", "verbose", "page", "nbr"])
-  except getopt.GetoptError:
-    print("[!] Unhandled option.")
-    usage()
-    sys.exit(2)
+  parser = argparse.ArgumentParser(
+    prog='randometal',
+    description='Randomly select bands from "metal-archives.com".',
+    usage="""
+       __                 _                   _        _ 
+      /__\ __ _ _ __   __| | ___   /\/\   ___| |_ __ _| |
+     / \/// _` | '_ \ / _` |/ _ \ /    \ / _ \ __/ _` | |
+    / _  \ (_| | | | | (_| | (_) / /\/\ \  __/ || (_| | |
+    \/ \_/\__,_|_| |_|\__,_|\___/\/    \/\___|\__\__,_|_|
+  """) 
+  parser.add_argument('-y', '--youtube', action='store_true', help='try to find an play songs only on YouTube')
+  parser.add_argument('-v', '--verbose', action='store_true', help='display more informations')
+  parser.add_argument('-p', '--page', action='store_true', help='open the archive-metal page of the band')
+  parser.add_argument('-n', '--nbr', default=1, type=int, help='number of bands to search. One by default')
 
-  for opt, arg in opts:
-    if opt in ("-h", "--help"):
-      usage()
-      sys.exit() 
-    elif opt in ("-y", "--youtube"):
-      only_yt = True
-    elif opt in ("-v", "--verbose"):
-      glob_verbose = True
-    elif opt in ("-p", "--page"):
-      glob_print_page = True
-    elif opt in ("-n", "--nbr"):
-      nbr = int(arg)
-    else:
-      print("[!] Unhandled option.")
-      usage()
-      sys.exit(2)
+  args = parser.parse_args()
+
+  global glob_verbose
+  glob_verbose = args.verbose
+  global glob_print_page
+  glob_print_page = args.page
 
   links = []
-  for i in range(nbr):
-    links.append(find_band(only_yt))
-    if glob_verbose:
-      print("[*] Link : " + links[i])
-    print("    ====")
+  for i in range(args.nbr):
+    links.append(find_band(args.youtube))
+    if args.verbose:
+      print("[*] Link : " + links[i] + "\n    ====")
 
 if __name__ == "__main__":
   main(sys.argv[1:])
