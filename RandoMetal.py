@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 
-# TODO: Check errors for the resquests.get(...)
 # TODO: Use a dict with all information about bands.
+# TODO: Add args for WEBSITE_TO_TARGET
 
 import sys
 import urllib
@@ -12,29 +12,33 @@ import argparse
 from bs4 import BeautifulSoup
 import requests
 
+HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/54.0'}
+
 URL_RANDOM = "https://www.metal-archives.com/band/random"
 URL_BAND_PAGE = "https://www.metal-archives.com/bands/{name:s}/{id:s}"
 URL_CD = "https://www.metal-archives.com/band/discography/id/{id:s}/tab/all"
 URL_YT = "https://www.youtube.com/results?search_query={query:s}"
 
+WEBSITE_TO_TARGET = ['bandcamp', 'soundcloud', 'youtube', 'spotify', 'myspace']
+
+PRED_MUSIC_LINK = lambda tag: tag.name == 'a' and tag.get('title') is not None and tag['title'].find('Go to:') != -1
+
+def get_html_content(url):
+  """Get html content from a url."""
+  response = requests.get(url, headers=HEADERS)
+  return response.ok, response.content
+
 def clean_name(name):
-  """ Clean the caracters who are not decoded.  """
-  
+  """Clean the caracters who are not decoded."""
   name = urllib.parse.unquote(name)
   name = name.replace('_', ' ')
   return name  
 
-def get_name_id(html):
-  """
-  Get the name and the id of the band corresponding to the html page.
-  """
-
-  raw_data = BeautifulSoup(html, "html.parser").find('h1', {"class": 'band_name'})
-  raw_data = raw_data.find('a').get('href')
-  raw_data = str(raw_data).split('/', 5)
-  name = raw_data[4]
-  ide = raw_data[5]
-
+def get_name_id(parser):
+  """Get the name and the id of the band corresponding to the html page."""
+  band_name_tag = parser.find('h1', {"class": 'band_name'})
+  url_band_page = band_name_tag.find('a').get('href')
+  name, ide = url_band_page.split('bands/')[1].split('/')
   return name, ide
 
 def get_cd(ide):
@@ -47,7 +51,7 @@ def get_cd(ide):
   class_word = ["demo", "single", "album", "other"]
   url_cd = URL_CD.format(id=ide)
 
-  html = requests.get(url_cd).content
+  html = get_html_content(url_cd)
   for i in range(len(class_word)):
     raw_data += BeautifulSoup(html, "html.parser").findAll('a', {"class" :class_word[i]})
 
@@ -58,54 +62,28 @@ def get_cd(ide):
 
   return cd
 
-def get_related_links(html):
-  """
-  Take the link in the 'Related links' onglet of archive-metal.
-  """
-
-  url = None
-  raw_data = BeautifulSoup(html, "html.parser").find('a', {"title": "Related links"})
-
-  if raw_data is not None:
-    url = str(raw_data['href'])
+def get_related_links(parser):
+  """Take the link in the 'Related links' onglet of archive-metal"""
+  related_links_tag = parser.find('a', {'title': 'Related links'})
+  if related_links_tag is not None:
+    return related_links_tag['href']
   else:
     print("[!] No related link for this band.", file=sys.stderr)
-
-  return url
-
+    return None
 
 def get_music_link(html, name):
-  """
-  Extract links
-  """
-
-  i = 0
-  raw_data = []
-  music_link = []
-  title_list = ["Go to: Myspace", "Go to: Myspace Page", "Go to: Soundcloud", "Go to: Youtube", "Go to: Youtube Page", "Go to: Bandcamp", "Go to: MySpace", "Go to: MySpace Page", "Go to: SoundCloud", "Go to: YouTube", "Go to: YouTube Page", "Go to: YouTube Channel", "Go to: BandCamp", "Go to: "+name+" @ Myspace", "Go to: "+name+" @ Soundcloud", "Go to: "+name+" @ youtube", "Go to: "+name+" @ Bandcamp", "Go to: "+name+" @ MySpace", "Go to: "+name+" @ SoundCloud", "Go to: "+name+" @ youTube", "Go to: "+name+" @ BandCamp"]
-
-  while (raw_data is None) or (i < (len(title_list))):
-    raw_data += BeautifulSoup(html, "html.parser").findAll('a', {"title": title_list[i]})        
-    i += 1        
-
-  for j in range(len(raw_data)):
-    music_link.append(raw_data[j].get('href'))
-
-  return music_link
+  """Extract links to music websites"""
+  parser = BeautifulSoup(html, "html.parser")
+  a_tags = parser.findAll(PRED_MUSIC_LINK)
+  return [a_tag['href'] for a_tag in a_tags]
 
 def chose_link(list_link):
-  """
-  Function who return musical link
-  """
-
-  site_order = ["bandcamp", "soundcloud", "youtube", "myspace"]
-
-  for site in site_order:
+  """Find the most interesting musical link"""
+  for site in WEBSITE_TO_TARGET:
     for link in list_link:
       if site in link:
         return link
-  
-  return None
+  return ''
 
 def get_url_youtube(html):
   """
@@ -135,7 +113,7 @@ def request_youtube(args, name, cd):
     print("[*] YouTube query: " + query.replace('+', ' '))
 
   url_yt = URL_YT.format(query=query)
-  html_yt = requests.get(url_yt).content
+  html_yt = get_html_content(url_yt)
   link_yt = get_url_youtube(html_yt)
 
   return link_yt
@@ -155,34 +133,51 @@ def only_youtube(args, name, ide):
 
 def find_band(args):
   """ Find url for one band and display it. """
-  
-  html = requests.get(URL_RANDOM).content
-  name, ide = get_name_id(html)
+ 
+  response = requests.get(URL_RANDOM, headers=HEADERS)
+  if not response.ok:
+    print("[!] Cannot get a random band (status code {status:d}).".format(status=response.status_code), file=sys.stderr)
+    return
+
+  parser = BeautifulSoup(response.content, "html.parser")
+  name, ide = get_name_id(parser)
   name = clean_name(name)
 
   if args.page:
     webbrowser.open(URL_BAND_PAGE.format(name=name, id=ide))
 
-  print("[#] Band: " + name + ", ID: " + ide)
+  print("[#] Band: {name:s}, ID: {id:s}".format(name=name, id=ide))
   
   if args.youtube:
     return only_youtube(args, name, ide)
   else:
-    url = get_related_links(html)
-    html = requests.get(url).content
-    list_link = get_music_link(html, name)
+    related_links_url = get_related_links(parser)
+    response = requests.get(related_links_url, headers=HEADERS)
+    if not response.ok:
+      print("[!] Cannot access the 'related links' page (status code {status:d}).".format(status=response.status_code), file=sys.stderr)
+      return
 
-    link = None
-    if list_link:
+    list_link = get_music_link(response.content, name)
+    if len(list_link) > 0:
       link = chose_link(list_link)
-    if link:
-      webbrowser.open(link)
-      return link
+      if len(link) > 0:
+        webbrowser.open(link)
+        return link
+      else:
+        print("[!] No music links related to one of the following site: {sites:s}.".format(sites=join(', ', WEBSITE_TO_TARGET)), file=sys.stderr)
     else:
-      print("[!] No musical link for this band.\n    Trying on youtube.", file=sys.stderr)
-      return only_youtube(args, name, ide)
+      print("[!] No related links for this band", file=sys.stderr)
 
-def main():
+    print("[!] No musical link for this band.\n    Trying on youtube.", file=sys.stderr)
+    return only_youtube(args, name, ide)
+
+def main(args):
+  for i in range(args.nbr):
+    link = find_band(args)
+    if args.verbose and link is not None:
+      print("[*] Link : " + link + "\n    ====")
+
+if __name__ == "__main__":
   parser = argparse.ArgumentParser(
     prog='randometal',
     description='Randomly select bands from "metal-archives.com".',
@@ -200,10 +195,4 @@ def main():
 
   args = parser.parse_args()
 
-  for i in range(args.nbr):
-    link = find_band(args)
-    if args.verbose and link is not None:
-      print("[*] Link : " + link + "\n    ====")
-
-if __name__ == "__main__":
-  main()
+  main(args)
