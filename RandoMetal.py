@@ -50,7 +50,7 @@ def get_cd(ide):
   try:    
     cd = ''.join(raw_data[(len(raw_data))-1].findAll(text=True))
   except IndexError:
-    print("[!] No album for the band\n")
+    print("[!] No album for the band.", file=sys.stderr)
 
   return cd
 
@@ -65,7 +65,7 @@ def get_related_links(html):
   if raw_data is not None:
     url = str(raw_data['href'])
   else:
-    print("[!] No related link for this band\n")
+    print("[!] No related link for this band.", file=sys.stderr)
 
   return url
 
@@ -113,7 +113,7 @@ def get_url_youtube(html):
   if raw_data is not None:
     url = str(raw_data['href'])
   else:
-    print("[!] No video clip of the band in Youtube\n")
+    print("[!] No video clip of the band in Youtube.", file=sys.stderr)
 
   return url
 
@@ -179,7 +179,7 @@ def find_band(only_yt):
       webbrowser.open(link)
       return link
     else:
-      print("[!] No musical link for this band.\n    Trying on youtube.")
+      print("[!] No musical link for this band.\n    Trying on youtube.", file=sys.stderr)
       return only_youtube(name, ide, False)
 
 """
