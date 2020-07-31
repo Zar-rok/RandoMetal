@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 
+# TODO: Check errors for the resquests.get(...)
+# TODO: Use a dict with all information about bands.
+
 import sys
 import urllib
 import webbrowser
@@ -10,8 +13,9 @@ from bs4 import BeautifulSoup
 import requests
 
 URL_RANDOM = "https://www.metal-archives.com/band/random"
-glob_verbose = False
-glob_print_page = False
+URL_BAND_PAGE = "https://www.metal-archives.com/bands/{name:s}/{id:s}"
+URL_CD = "https://www.metal-archives.com/band/discography/id/{id:s}/tab/all"
+URL_YT = "https://www.youtube.com/results?search_query={query:s}"
 
 def clean_name(name):
   """ Clean the caracters who are not decoded.  """
@@ -41,7 +45,7 @@ def get_cd(ide):
   cd = None
   raw_data  = []
   class_word = ["demo", "single", "album", "other"]
-  url_cd = "https://www.metal-archives.com/band/discography/id/" + str(ide) + "/tab/all"
+  url_cd = URL_CD.format(id=ide)
 
   html = requests.get(url_cd).content
   for i in range(len(class_word)):
@@ -117,55 +121,52 @@ def get_url_youtube(html):
 
   return url
 
-def request_youtube(name, cd):
+def request_youtube(args, name, cd):
   """"
   Make a request to Youtube and return the first link.
   """
-  
-  YT_URL = "https://www.youtube.com/results?search_query="
 
   if cd is None:
-    query = name + "+metal+music"
+    query = "{name:s}+metal+music".format(name=name)
   else:
-    query = name + "+-+" + cd
-	
-  if glob_verbose:
-    print("[*] Query: " + query.replace('+', ' '))
+    query = "{name:s}+-+{cd:s}".format(name=name, cd=cd)
 
-  url_yt = YT_URL + query
+  if args.verbose:
+    print("[*] YouTube query: " + query.replace('+', ' '))
+
+  url_yt = URL_YT.format(query=query)
   html_yt = requests.get(url_yt).content
   link_yt = get_url_youtube(html_yt)
 
   return link_yt
 
-def only_youtube(name, ide, first):
+def only_youtube(args, name, ide):
   """
   Function who try to play the song.
   """
 
   cd = get_cd(ide)
-  link = request_youtube(name, cd)
+  link = request_youtube(args, name, cd)
 
   if link is not None:
     yt_link = "https://www.youtube.com" + link
     webbrowser.open(yt_link)
     return yt_link
 
-
-def find_band(only_yt):
+def find_band(args):
   """ Find url for one band and display it. """
   
   html = requests.get(URL_RANDOM).content
   name, ide = get_name_id(html)
   name = clean_name(name)
 
-  if glob_print_page:
-    webbrowser.open("https://www.metal-archives.com/bands/" + name + "/" + ide)
+  if args.page:
+    webbrowser.open(URL_BAND_PAGE.format(name=name, id=ide))
 
   print("[#] Band: " + name + ", ID: " + ide)
   
-  if only_yt:
-    return only_youtube(name, ide, True)
+  if args.youtube:
+    return only_youtube(args, name, ide)
   else:
     url = get_related_links(html)
     html = requests.get(url).content
@@ -174,19 +175,14 @@ def find_band(only_yt):
     link = None
     if list_link:
       link = chose_link(list_link)
-    
     if link:
       webbrowser.open(link)
       return link
     else:
       print("[!] No musical link for this band.\n    Trying on youtube.", file=sys.stderr)
-      return only_youtube(name, ide, False)
+      return only_youtube(args, name, ide)
 
-"""
-Main
-"""
-
-def main(argv):
+def main():
   parser = argparse.ArgumentParser(
     prog='randometal',
     description='Randomly select bands from "metal-archives.com".',
@@ -204,16 +200,10 @@ def main(argv):
 
   args = parser.parse_args()
 
-  global glob_verbose
-  glob_verbose = args.verbose
-  global glob_print_page
-  glob_print_page = args.page
-
-  links = []
   for i in range(args.nbr):
-    links.append(find_band(args.youtube))
-    if args.verbose:
-      print("[*] Link : " + links[i] + "\n    ====")
+    link = find_band(args)
+    if args.verbose and link is not None:
+      print("[*] Link : " + link + "\n    ====")
 
 if __name__ == "__main__":
-  main(sys.argv[1:])
+  main()
