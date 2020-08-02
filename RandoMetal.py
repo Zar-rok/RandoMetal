@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 
-# TODO: Use a dict with all information about bands.
 # TODO: Add args for WEBSITE_TO_TARGET
 
+import re
 import sys
 import urllib
 import webbrowser
@@ -16,17 +16,16 @@ HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/201
 
 URL_RANDOM = "https://www.metal-archives.com/band/random"
 URL_BAND_PAGE = "https://www.metal-archives.com/bands/{name:s}/{id:s}"
-URL_CD = "https://www.metal-archives.com/band/discography/id/{id:s}/tab/all"
-URL_YT = "https://www.youtube.com/results?search_query={query:s}"
+URL_DISCOGRAPHY = "https://www.metal-archives.com/band/discography/id/{id:s}/tab/all"
+URL_YT_SEARCH = "https://www.youtube.com/results?search_query={query:s}"
+URL_YT_VIDEO = "https://www.youtube.com/watch?v={key:s}"
 
+# From the most interesting type of disco./website to the least one.
+DISCOGRAPHY_CLASSES = ['album', 'single', 'other', 'demo']
 WEBSITE_TO_TARGET = ['bandcamp', 'soundcloud', 'youtube', 'spotify', 'myspace']
 
 PRED_MUSIC_LINK = lambda tag: tag.name == 'a' and tag.get('title') is not None and tag['title'].find('Go to:') != -1
-
-def get_html_content(url):
-  """Get html content from a url."""
-  response = requests.get(url, headers=HEADERS)
-  return response.ok, response.content
+PATTERN_YT_JSON_VIDEO_DATA = re.compile('window\["ytInitialData"\] = ')
 
 def clean_name(name):
   """Clean the caracters who are not decoded."""
@@ -41,26 +40,22 @@ def get_name_id(parser):
   name, ide = url_band_page.split('bands/')[1].split('/')
   return name, ide
 
-def get_cd(ide):
-  """
-  Take an id and return the name of the newest album/demo/single of a band.
-  """
+def get_last_discography(ide):
+  """Get the name of the newest album/demo/single of a band"""
+  url_disco = URL_DISCOGRAPHY.format(id=ide)
+  response = requests.get(url_disco, headers=HEADERS)
+  if not response.ok:
+    print("[!] Cannot get the band's discography (status code {status:d}).".format(status=response.status_code), file=sys.stderr)
+    return ''
 
-  cd = None
-  raw_data  = []
-  class_word = ["demo", "single", "album", "other"]
-  url_cd = URL_CD.format(id=ide)
+  parser = BeautifulSoup(response.content, "html.parser")
+  for cls in DISCOGRAPHY_CLASSES:
+    discos = parser.findAll('a', {'class': cls})
+    if len(discos) > 0:
+      return discos[-1].text
 
-  html = get_html_content(url_cd)
-  for i in range(len(class_word)):
-    raw_data += BeautifulSoup(html, "html.parser").findAll('a', {"class" :class_word[i]})
-
-  try:    
-    cd = ''.join(raw_data[(len(raw_data))-1].findAll(text=True))
-  except IndexError:
-    print("[!] No album for the band.", file=sys.stderr)
-
-  return cd
+  print("[!] No discography for the band.", file=sys.stderr)
+  return ''
 
 def get_related_links(parser):
   """Take the link in the 'Related links' onglet of archive-metal"""
@@ -85,55 +80,45 @@ def chose_link(list_link):
         return link
   return ''
 
-def get_url_youtube(html):
-  """
-  Take the first video link of a html of Youtube.
-  """    
+def get_key_youtube(html):
+  """Get the key of the first video in the result page."""    
+  parser = BeautifulSoup(html, "html.parser")
+  script_content = parser.findAll('script', text=PATTERN_YT_JSON_VIDEO_DATA)[0]
+  for m in re.finditer('watch\?v=(.{11})",', script_content.text):
+      return m.group(1)
+  return ''
 
-  url = None    
-  raw_data = BeautifulSoup(html, "html.parser").find('a', {"dir": "ltr"})
-  if raw_data is not None:
-    url = str(raw_data['href'])
+def request_youtube(args, name, last_disco):
+  """"Make a request to Youtube and return the first link."""
+  if len(last_disco) > 0:
+    query = '"{name:s}+-+{disco:s}"'.format(name=name, disco=last_disco)
   else:
-    print("[!] No video clip of the band in Youtube.", file=sys.stderr)
-
-  return url
-
-def request_youtube(args, name, cd):
-  """"
-  Make a request to Youtube and return the first link.
-  """
-
-  if cd is None:
-    query = "{name:s}+metal+music".format(name=name)
-  else:
-    query = "{name:s}+-+{cd:s}".format(name=name, cd=cd)
+    query = '"{name:s}"+metal+music'.format(name=name)
 
   if args.verbose:
     print("[*] YouTube query: " + query.replace('+', ' '))
 
-  url_yt = URL_YT.format(query=query)
-  html_yt = get_html_content(url_yt)
-  link_yt = get_url_youtube(html_yt)
+  url_yt = URL_YT_SEARCH.format(query=query)
+  response = requests.get(url_yt, headers=HEADERS)
+  if not response.ok:
+    print("[!] Cannot make the query on YouTube (status code {status:d}).".format(status=response.status_code), file=sys.stderr)
+    return ''
 
-  return link_yt
+  return get_key_youtube(response.content)
 
 def only_youtube(args, name, ide):
-  """
-  Function who try to play the song.
-  """
-
-  cd = get_cd(ide)
-  link = request_youtube(args, name, cd)
-
-  if link is not None:
-    yt_link = "https://www.youtube.com" + link
+  """Search band last album/ep/demo/... on YouTube"""
+  last_disco = get_last_discography(ide)
+  key = request_youtube(args, name, last_disco)
+  if len(key) > 0:
+    yt_link = URL_YT_VIDEO.format(key=key)
     webbrowser.open(yt_link)
     return yt_link
 
 def find_band(args):
+  # TODO: split in functions
   """ Find url for one band and display it. """
- 
+
   response = requests.get(URL_RANDOM, headers=HEADERS)
   if not response.ok:
     print("[!] Cannot get a random band (status code {status:d}).".format(status=response.status_code), file=sys.stderr)
@@ -164,11 +149,11 @@ def find_band(args):
         webbrowser.open(link)
         return link
       else:
-        print("[!] No music links related to one of the following site: {sites:s}.".format(sites=join(', ', WEBSITE_TO_TARGET)), file=sys.stderr)
+        print("[!] No music links related to one of the following site: {sites:s}.".format(sites=', '.join(WEBSITE_TO_TARGET)), file=sys.stderr)
     else:
-      print("[!] No related links for this band", file=sys.stderr)
+      print("[!] No related links for this band.", file=sys.stderr)
 
-    print("[!] No musical link for this band.\n    Trying on youtube.", file=sys.stderr)
+    print("[!] Trying on youtube.", file=sys.stderr)
     return only_youtube(args, name, ide)
 
 def main(args):
