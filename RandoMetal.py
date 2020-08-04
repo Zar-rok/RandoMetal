@@ -95,11 +95,11 @@ def get_key_youtube(html):
 def request_youtube(args, band_name, last_disco):
   """"Make a request to Youtube and return the first link."""
   if last_disco:
-    query = f'"{band_name}+-+{last_disco}"'
+    query = f'"{band_name} - {last_disco}"'
   else:
-    query = f'"{band_name}"+metal+music'
+    query = f'"{band_name}" metal music'
 
-  url_yt = URL_YT_SEARCH.format(query=query)
+  url_yt = URL_YT_SEARCH.format(query=urllib.parse.quote_plus(query, safe=''))
   content = get_html_content(args, url_yt, "Cannot make the query on YouTube")
   if content:
     return get_key_youtube(content)
