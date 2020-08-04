@@ -1,12 +1,9 @@
 # RandoMetal
-Simple python script to randomly play a metal music.
 
-Make sure you have BeautifulSoup4 and Requests to work.
+Python script which randomly select a band from [`metal-archives.com`](metal-archives.com) and search links to the music (i.e., on bandcamp or YouTube).
 
-* Use [pip](https://pypi.python.org/pypi/pip) to install them :
-  * ``` pip install beautifulsoup4```
-  * ``` pip install requests```
+## Dependencies
 
-* Then you can launch the script : ``` python RandoMetal.py```
+Make sure you have installed [BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/) and [Requests](https://requests.readthedocs.io/en/master/).
 
-Enjoy !
+For example, use [pip](https://pypi.python.org/pypi/pip): `pip install beautifulsoup4 requests`
