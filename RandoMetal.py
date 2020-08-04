@@ -26,6 +26,19 @@ WEBSITE_TO_TARGET = ['bandcamp', 'soundcloud', 'youtube', 'spotify', 'myspace']
 PRED_MUSIC_LINK = lambda tag: tag.name == 'a' and tag.get('title') is not None and tag['title'].find('Go to:') != -1
 PATTERN_YT_JSON_VIDEO_DATA = re.compile('window\["ytInitialData"\] = ')
 
+def get_html_content(args, url, error_msg):
+  """Get the HTML content of a Web page"""
+  if args.verbose:
+    print(f"[#] GET: {url}")
+
+  response = requests.get(url, headers=HEADERS)
+  if response.ok:
+    return response.content
+  else:
+    print((f"[!] {error_msg}\n"
+           f"    Status code: {response.status_code})."), file=sys.stderr)
+    return ''
+
 def clean_name(name):
   """Clean the caracters who are not decoded."""
   name = urllib.parse.unquote(name)
@@ -39,23 +52,19 @@ def get_name_id(parser):
   name, ide = url_band_page.split('bands/')[1].split('/')
   return name, ide
 
-def get_last_discography(ide):
+def get_last_discography(args, ide):
   """Get the name of the newest album/demo/single of a band"""
   url_disco = URL_DISCOGRAPHY.format(id=ide)
-  response = requests.get(url_disco, headers=HEADERS)
-  if not response.ok:
-    print(("[!] Cannot get the band's discography\n"
-           f"    Status code: {response.status_code}."), file=sys.stderr)
+  content = get_html_content(args, url_disco, "Cannot get the band's discography")
+  if content:
+    parser = BeautifulSoup(content, "lxml")
+    for cls in DISCOGRAPHY_CLASSES:
+      discos = parser.findAll('a', {'class': cls})
+      if discos:
+        return discos[-1].text
+
+    print("[!] No discography for the band.", file=sys.stderr)
     return ''
-
-  parser = BeautifulSoup(response.content, "html.parser")
-  for cls in DISCOGRAPHY_CLASSES:
-    discos = parser.findAll('a', {'class': cls})
-    if discos:
-      return discos[-1].text
-
-  print("[!] No discography for the band.", file=sys.stderr)
-  return ''
 
 def get_related_links(parser):
   """Take the link in the 'Related links' onglet of archive-metal"""
@@ -68,7 +77,7 @@ def get_related_links(parser):
 
 def get_music_link(html, name):
   """Extract links to music websites"""
-  parser = BeautifulSoup(html, "html.parser")
+  parser = BeautifulSoup(html, "lxml")
   a_tags = parser.findAll(PRED_MUSIC_LINK)
   if a_tags:
     return [a_tag['href'] for a_tag in a_tags]
@@ -80,13 +89,13 @@ def chose_link(list_link):
     for link in list_link:
       if site in link:
         return link
-  print(("[!] No music links related to one of\n"
-         f"    the following site: {', '.join(WEBSITE_TO_TARGET))}."), file=sys.stderr)
+  print(("[!] No music links related to one of the following\n"
+        f"    site: {', '.join(WEBSITE_TO_TARGET)}."), file=sys.stderr)
   return ''
 
 def get_key_youtube(html):
   """Get the key of the first video in the result page."""    
-  parser = BeautifulSoup(html, "html.parser")
+  parser = BeautifulSoup(html, "lxml")
   script_content = parser.findAll('script', text=PATTERN_YT_JSON_VIDEO_DATA)[0]
   for m in re.finditer('watch\?v=(.{11})",', script_content.text):
       return m.group(1)
@@ -95,25 +104,18 @@ def get_key_youtube(html):
 def request_youtube(args, name, last_disco):
   """"Make a request to Youtube and return the first link."""
   if last_disco:
-    query = '"{name:s}+-+{disco:s}"'.format(name=name, disco=last_disco)
+    query = f'"{name}+-+{last_disco}"'
   else:
-    query = '"{name:s}"+metal+music'.format(name=name)
-
-  if args.verbose:
-    print("[*] YouTube query: " + query.replace('+', ' '))
+    query = f'"{name}"+metal+music'
 
   url_yt = URL_YT_SEARCH.format(query=query)
-  response = requests.get(url_yt, headers=HEADERS)
-  if not response.ok:
-    print(("[!] Cannot make the query on YouTube\n"
-           f"    Status code: {response.status_code})."), file=sys.stderr)
-    return ''
-
-  return get_key_youtube(response.content)
+  content = get_html_content(url_yt, "Cannot make the query on YouTube")
+  if content:
+    return get_key_youtube(content)
 
 def only_youtube(args, name, ide):
   """Search band last album/ep/demo/... on YouTube"""
-  last_disco = get_last_discography(ide)
+  last_disco = get_last_discography(args, ide)
   if last_disco:
     key = request_youtube(args, name, last_disco)
     if key:
@@ -127,46 +129,38 @@ def search_music(args, name, ide, parser):
     return only_youtube(args, name, ide)
   else:
     related_links_url = get_related_links(parser)
-    response = requests.get(related_links_url, headers=HEADERS)
-    if not response.ok:
-      print(("[!] Cannot access the 'related links' page\n"
-             f"    Status code {response.status_code})."), file=sys.stderr)
-      return ''
+    content = get_html_content(args, related_links_url, "Cannot access the 'related links' page")
+    if content:
+      list_link = get_music_link(content, name)
+      if list_link:
+        link = chose_link(list_link)
+        if link:
+          webbrowser.open(link)
+          return link
 
-    list_link = get_music_link(response.content, name)
-    if list_link:
-      link = chose_link(list_link)
-      if link:
-        webbrowser.open(link)
-        return link
-
-    print("[!] Trying on youtube.", file=sys.stderr)
-    return only_youtube(args, name, ide)
+      print("[!] Trying on youtube.", file=sys.stderr)
+      return only_youtube(args, name, ide)
 
 def find_band(args):
   """ Find url for one band and display it. """
-  response = requests.get(URL_RANDOM, headers=HEADERS)
-  if not response.ok:
-    print(("[!] Cannot get a random band\n"
-           f"    Status code: {response.status_code}).", file=sys.stderr)
-    return ''
+  content = get_html_content(args, URL_RANDOM, "Cannot get a random band")
+  if content:
+    parser = BeautifulSoup(content, "lxml")
+    name, ide = get_name_id(parser)
+    name = clean_name(name)
 
-  parser = BeautifulSoup(response.content, "html.parser")
-  name, ide = get_name_id(parser)
-  name = clean_name(name)
+    if args.page:
+      webbrowser.open(URL_BAND_PAGE.format(name=name, id=ide))
 
-  if args.page:
-    webbrowser.open(URL_BAND_PAGE.format(name=name, id=ide))
+    print(f"[*] Band: {name}, ID: {ide}")
 
-  print(f"[#] Band: {name}, ID: {ide}")
-
-  search_music(args, name, ide, parser)
+    search_music(args, name, ide, parser)
 
 def main(args):
   for _ in range(args.nbr):
     link = find_band(args)
     if args.verbose and link is not None:
-      print(f"[*] Link: {link}\n    ====")
+      print(f"[#] Link: {link}\n    ====")
 
 if __name__ == "__main__":
   import argparse
