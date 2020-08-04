@@ -37,47 +37,42 @@ def get_html_content(args, url, error_msg):
   else:
     print((f"[!] {error_msg}\n"
            f"    Status code: {response.status_code})."), file=sys.stderr)
-    return ''
 
-def clean_name(name):
+def clean_name(band_name):
   """Clean the caracters who are not decoded."""
-  name = urllib.parse.unquote(name)
-  name = name.replace('_', ' ')
-  return name  
+  band_name = urllib.parse.unquote(band_name)
+  return band_name.replace('_', ' ')
 
 def get_name_id(parser):
   """Get the name and the id of the band corresponding to the html page."""
   band_name_tag = parser.find('h1', {"class": 'band_name'})
   url_band_page = band_name_tag.find('a').get('href')
-  name, ide = url_band_page.split('bands/')[1].split('/')
-  return name, ide
+  return url_band_page.split('bands/')[1].split('/')
 
-def get_last_discography(args, ide):
+def get_last_discography(args, band_id):
   """Get the name of the newest album/demo/single of a band"""
-  url_disco = URL_DISCOGRAPHY.format(id=ide)
+  url_disco = URL_DISCOGRAPHY.format(id=band_id)
   content = get_html_content(args, url_disco, "Cannot get the band's discography")
   if content:
-    parser = BeautifulSoup(content, "lxml")
+    parser = BeautifulSoup(content, 'lxml')
     for cls in DISCOGRAPHY_CLASSES:
       discos = parser.findAll('a', {'class': cls})
       if discos:
         return discos[-1].text
 
     print("[!] No discography for the band.", file=sys.stderr)
-    return ''
 
 def get_related_links(parser):
-  """Take the link in the 'Related links' onglet of archive-metal"""
+  """Take the link in the 'Related links' onglet of metal-archives"""
   related_links_tag = parser.find('a', {'title': 'Related links'})
   if related_links_tag:
     return related_links_tag['href']
   else:
     print("[!] No related link for this band.", file=sys.stderr)
-    return ''
 
-def get_music_link(html, name):
+def get_music_link(html):
   """Extract links to music websites"""
-  parser = BeautifulSoup(html, "lxml")
+  parser = BeautifulSoup(html, 'lxml')
   a_tags = parser.findAll(PRED_MUSIC_LINK)
   if a_tags:
     return [a_tag['href'] for a_tag in a_tags]
@@ -91,70 +86,70 @@ def chose_link(list_link):
         return link
   print(("[!] No music links related to one of the following\n"
         f"    site: {', '.join(WEBSITE_TO_TARGET)}."), file=sys.stderr)
-  return ''
 
 def get_key_youtube(html):
-  """Get the key of the first video in the result page."""    
-  parser = BeautifulSoup(html, "lxml")
-  script_content = parser.findAll('script', text=PATTERN_YT_JSON_VIDEO_DATA)[0]
+  """Get the key of the first vband_ido in the result page."""
+  parser = BeautifulSoup(html, 'lxml')
+  script_content = parser.findAll('script', text=PATTERN_YT_JSON_VIDEO_DATA)
+  print(script_content)
+  script_content = script_content[0]
   for m in re.finditer('watch\?v=(.{11})",', script_content.text):
       return m.group(1)
-  return ''
 
-def request_youtube(args, name, last_disco):
+def request_youtube(args, band_name, last_disco):
   """"Make a request to Youtube and return the first link."""
   if last_disco:
-    query = f'"{name}+-+{last_disco}"'
+    query = f'"{band_name}+-+{last_disco}"'
   else:
-    query = f'"{name}"+metal+music'
+    query = f'"{band_name}"+metal+music'
 
   url_yt = URL_YT_SEARCH.format(query=query)
-  content = get_html_content(url_yt, "Cannot make the query on YouTube")
+  content = get_html_content(args, url_yt, "Cannot make the query on YouTube")
   if content:
     return get_key_youtube(content)
 
-def only_youtube(args, name, ide):
+def only_youtube(args, band_name, band_id):
   """Search band last album/ep/demo/... on YouTube"""
-  last_disco = get_last_discography(args, ide)
+  last_disco = get_last_discography(args, band_id)
   if last_disco:
-    key = request_youtube(args, name, last_disco)
+    key = request_youtube(args, band_name, last_disco)
     if key:
       yt_link = URL_YT_VIDEO.format(key=key)
       webbrowser.open(yt_link)
       return yt_link
 
-def search_music(args, name, ide, parser):
-  """Search band's music via the 'Related links' of archive-metal or on YouTube"""
+def search_music(args, band_name, band_id, parser):
+  """Search band's music via the 'Related links' of metal-archives or on YouTube"""
   if args.youtube:
-    return only_youtube(args, name, ide)
+    return only_youtube(args, band_name, band_id)
   else:
     related_links_url = get_related_links(parser)
     content = get_html_content(args, related_links_url, "Cannot access the 'related links' page")
     if content:
-      list_link = get_music_link(content, name)
+      list_link = get_music_link(content)
       if list_link:
         link = chose_link(list_link)
         if link:
           webbrowser.open(link)
           return link
 
-      print("[!] Trying on youtube.", file=sys.stderr)
-      return only_youtube(args, name, ide)
+      print("[!] Trying on YouTube.", file=sys.stderr)
+      return only_youtube(args, band_name, band_id)
 
 def find_band(args):
   """ Find url for one band and display it. """
   content = get_html_content(args, URL_RANDOM, "Cannot get a random band")
   if content:
-    parser = BeautifulSoup(content, "lxml")
-    name, ide = get_name_id(parser)
-    name = clean_name(name)
+    parser = BeautifulSoup(content, 'lxml')
+    band_name, band_id = get_name_id(parser)
+    band_name = clean_name(band_name)
 
     if args.page:
-      webbrowser.open(URL_BAND_PAGE.format(name=name, id=ide))
+      webbrowser.open(URL_BAND_PAGE.format(name=band_name, id=band_id))
 
-    print(f"[*] Band: {name}, ID: {ide}")
+    print(f"[*] Band: {band_name}, ID: {band_id}")
 
-    search_music(args, name, ide, parser)
+    search_music(args, band_name, band_id, parser)
 
 def main(args):
   for _ in range(args.nbr):
@@ -176,7 +171,7 @@ if __name__ == "__main__":
   """) 
   parser.add_argument('-y', '--youtube', action='store_true', help='try to find an play songs only on YouTube')
   parser.add_argument('-v', '--verbose', action='store_true', help='display more informations')
-  parser.add_argument('-p', '--page', action='store_true', help='open the archive-metal page of the band')
+  parser.add_argument('-p', '--page', action='store_true', help='open the metal-archives page of the band')
   parser.add_argument('-n', '--nbr', default=1, type=int, help='number of bands to search. One by default')
 
   args = parser.parse_args()
