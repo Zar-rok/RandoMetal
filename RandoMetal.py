@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf8 -*-
 
-# TODO: Add args for WEBSITE_TO_TARGET
+# TODO: Add band's country to improve YouTube results accuracy
 
 import re
 import sys
@@ -18,10 +18,6 @@ URL_BAND_PAGE = "https://www.metal-archives.com/bands/{name:s}/{id:s}"
 URL_DISCOGRAPHY = "https://www.metal-archives.com/band/discography/id/{id:s}/tab/all"
 URL_YT_SEARCH = "https://www.youtube.com/results?search_query={query:s}"
 URL_YT_VIDEO = "https://www.youtube.com/watch?v={key:s}"
-
-# From the most interesting type of disco./website to the least one.
-DISCOGRAPHY_CLASSES = ['album', 'single', 'other', 'demo']
-WEBSITE_TO_TARGET = ['bandcamp', 'soundcloud', 'youtube', 'spotify', 'myspace']
 
 PRED_MUSIC_LINK = lambda tag: tag.name == 'a' and tag.get('title') is not None and tag['title'].find('Go to:') != -1
 PATTERN_YT_JSON_VIDEO_DATA = re.compile('window\["ytInitialData"\] = ')
@@ -55,9 +51,10 @@ def get_last_discography(args, band_id):
   content = get_html_content(args, url_disco, "Cannot get the band's discography")
   if content:
     parser = BeautifulSoup(content, 'lxml')
-    for cls in DISCOGRAPHY_CLASSES:
+    for cls in args.discography:
       discos = parser.findAll('a', {'class': cls})
       if discos:
+        # The last entry is the newest
         return discos[-1].text
 
     print("[!] No discography for the band.", file=sys.stderr)
@@ -78,20 +75,19 @@ def get_music_link(html):
     return [a_tag['href'] for a_tag in a_tags]
   print("[!] No related links for this band.", file=sys.stderr)
 
-def chose_link(list_link):
+def chose_link(args, list_link):
   """Find the most interesting musical link"""
-  for site in WEBSITE_TO_TARGET:
+  for site in args.website:
     for link in list_link:
       if site in link:
         return link
   print(("[!] No music links related to one of the following\n"
-        f"    site: {', '.join(WEBSITE_TO_TARGET)}."), file=sys.stderr)
+        f"    site: {', '.join(args.website)}."), file=sys.stderr)
 
 def get_key_youtube(html):
   """Get the key of the first vband_ido in the result page."""
   parser = BeautifulSoup(html, 'lxml')
   script_content = parser.findAll('script', text=PATTERN_YT_JSON_VIDEO_DATA)
-  print(script_content)
   script_content = script_content[0]
   for m in re.finditer('watch\?v=(.{11})",', script_content.text):
       return m.group(1)
@@ -128,7 +124,7 @@ def search_music(args, band_name, band_id, parser):
     if content:
       list_link = get_music_link(content)
       if list_link:
-        link = chose_link(list_link)
+        link = chose_link(args, list_link)
         if link:
           webbrowser.open(link)
           return link
@@ -144,7 +140,7 @@ def find_band(args):
     band_name, band_id = get_name_id(parser)
     band_name = clean_name(band_name)
 
-    if args.page:
+    if args.open_page:
       webbrowser.open(URL_BAND_PAGE.format(name=band_name, id=band_id))
 
     print(f"[*] Band: {band_name}, ID: {band_id}")
@@ -152,7 +148,7 @@ def find_band(args):
     search_music(args, band_name, band_id, parser)
 
 def main(args):
-  for _ in range(args.nbr):
+  for _ in range(args.number):
     link = find_band(args)
     if args.verbose and link is not None:
       print(f"[#] Link: {link}\n    ====")
@@ -169,10 +165,15 @@ if __name__ == "__main__":
     / _  \ (_| | | | | (_| | (_) / /\/\ \  __/ || (_| | |
     \/ \_/\__,_|_| |_|\__,_|\___/\/    \/\___|\__\__,_|_|
   """) 
-  parser.add_argument('-y', '--youtube', action='store_true', help='try to find an play songs only on YouTube')
   parser.add_argument('-v', '--verbose', action='store_true', help='display more informations')
-  parser.add_argument('-p', '--page', action='store_true', help='open the metal-archives page of the band')
-  parser.add_argument('-n', '--nbr', default=1, type=int, help='number of bands to search. One by default')
+  parser.add_argument('-n', '--number', default=1, type=int, help='number of bands to search')
+  parser.add_argument('-o', '--open-page', action='store_true', help='open the metal-archives page of bands')
+  parser.add_argument('-y', '--youtube', action='store_true', help='try to find an play songs on YouTube')
+
+  WEBSITE_TO_TARGET = ['bandcamp', 'soundcloud', 'youtube', 'spotify']
+  parser.add_argument('-w', '--website', nargs='+', default=WEBSITE_TO_TARGET, type=str, help=f'define the priority between websites in a decreasing order. The values correspond to the domain name of the Web sites. The default sites and order is: {", ".join(WEBSITE_TO_TARGET)}')
+  DISCOGRAPHY_CLASSES = ['album', 'single', 'other', 'demo']
+  parser.add_argument('-d', '--discography', nargs='+', default=DISCOGRAPHY_CLASSES, type=str, help=f'define the priority between classes of discography in a decreasing order. The values comes from the HTML content of the "Discography" onglet in metal-archives. The default classes and order is: {", ".join(DISCOGRAPHY_CLASSES)}')
 
   args = parser.parse_args()
 
