@@ -44,8 +44,8 @@ def get_last_discography(ide):
   url_disco = URL_DISCOGRAPHY.format(id=ide)
   response = requests.get(url_disco, headers=HEADERS)
   if not response.ok:
-    print("[!] Cannot get the band's discography (status code {status:d})."
-        .format(status=response.status_code), file=sys.stderr)
+    print(("[!] Cannot get the band's discography\n"
+           f"    Status code: {response.status_code}."), file=sys.stderr)
     return ''
 
   parser = BeautifulSoup(response.content, "html.parser")
@@ -80,8 +80,8 @@ def chose_link(list_link):
     for link in list_link:
       if site in link:
         return link
-  print("[!] No music links related to one of the following site: {sites:s}."
-      .format(sites=', '.join(WEBSITE_TO_TARGET)), file=sys.stderr)
+  print(("[!] No music links related to one of\n"
+         f"    the following site: {', '.join(WEBSITE_TO_TARGET))}."), file=sys.stderr)
   return ''
 
 def get_key_youtube(html):
@@ -105,8 +105,8 @@ def request_youtube(args, name, last_disco):
   url_yt = URL_YT_SEARCH.format(query=query)
   response = requests.get(url_yt, headers=HEADERS)
   if not response.ok:
-    print("[!] Cannot make the query on YouTube (status code {status:d})."
-        .format(status=response.status_code), file=sys.stderr)
+    print(("[!] Cannot make the query on YouTube\n"
+           f"    Status code: {response.status_code})."), file=sys.stderr)
     return ''
 
   return get_key_youtube(response.content)
@@ -129,8 +129,8 @@ def search_music(args, name, ide, parser):
     related_links_url = get_related_links(parser)
     response = requests.get(related_links_url, headers=HEADERS)
     if not response.ok:
-      print("[!] Cannot access the 'related links' page (status code {status:d})."
-          .format(status=response.status_code), file=sys.stderr)
+      print(("[!] Cannot access the 'related links' page\n"
+             f"    Status code {response.status_code})."), file=sys.stderr)
       return ''
 
     list_link = get_music_link(response.content, name)
@@ -147,8 +147,8 @@ def find_band(args):
   """ Find url for one band and display it. """
   response = requests.get(URL_RANDOM, headers=HEADERS)
   if not response.ok:
-    print("[!] Cannot get a random band (status code {status:d})."
-        .format(status=response.status_code), file=sys.stderr)
+    print(("[!] Cannot get a random band\n"
+           f"    Status code: {response.status_code}).", file=sys.stderr)
     return ''
 
   parser = BeautifulSoup(response.content, "html.parser")
@@ -158,7 +158,7 @@ def find_band(args):
   if args.page:
     webbrowser.open(URL_BAND_PAGE.format(name=name, id=ide))
 
-  print("[#] Band: {name:s}, ID: {id:s}".format(name=name, id=ide))
+  print(f"[#] Band: {name}, ID: {ide}")
 
   search_music(args, name, ide, parser)
 
@@ -166,7 +166,7 @@ def main(args):
   for _ in range(args.nbr):
     link = find_band(args)
     if args.verbose and link is not None:
-      print("[*] Link : " + link + "\n    ====")
+      print(f"[*] Link: {link}\n    ====")
 
 if __name__ == "__main__":
   import argparse
