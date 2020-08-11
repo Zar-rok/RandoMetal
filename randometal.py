@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# -*- coding: utf8 -*-
+# encoding: utf8
 """
 Python script which randomly select a band from metal-archives.com
 and search links to the music (i.e., on bandcamp or YouTube).
@@ -10,10 +10,11 @@ and search links to the music (i.e., on bandcamp or YouTube).
 
 import re
 import sys
-import urllib
+import urllib.parse
 import webbrowser
+from typing import List, Any
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup  # type: ignore
 import requests
 
 HEADERS = {
@@ -31,40 +32,40 @@ URL_YT_VIDEO = "https://www.youtube.com/watch?v={key:s}"
 PATTERN_YT_JSON_VIDEO_DATA = re.compile(r'window\["ytInitialData"\] = ')
 
 
-def pred_music_link(tag):
+def pred_music_link(tag: Any) -> bool:
     """Predicate to filter 'related links'"""
     return tag.name == 'a' and tag.get(
         'title') and tag['title'].find('Go to:') != -1
 
 
-def get_html_content(args, url, error_msg):
+def get_html_content(args: Any, url: str, error_msg: str) -> str:
     """Get the HTML content of a Web page"""
     if args.verbose:
         print(f"[#] GET: {url}")
 
     response = requests.get(url, headers=HEADERS)
     if response.ok:
-        return response.content
+        return response.text
     print((f"[!] {error_msg}\n"
            f"    Status code: {response.status_code})."),
           file=sys.stderr)
     return ''
 
 
-def clean_name(band_name):
+def clean_name(band_name: str) -> str:
     """Clean the caracters who are not decoded."""
     band_name = urllib.parse.unquote(band_name)
     return band_name.replace('_', ' ')
 
 
-def get_name_id(parser):
+def get_name_id(parser: Any) -> List[str]:
     """Get the name and the id of the band corresponding to the html page."""
     band_name_tag = parser.find('h1', {"class": 'band_name'})
     url_band_page = band_name_tag.find('a').get('href')
     return url_band_page.split('bands/')[1].split('/')
 
 
-def get_last_discography(args, band_id):
+def get_last_discography(args: Any, band_id: str) -> str:
     """Get the name of the newest album/demo/single of a band"""
     url_disco = URL_DISCOGRAPHY.format(id=band_id)
     content = get_html_content(args, url_disco,
@@ -81,7 +82,7 @@ def get_last_discography(args, band_id):
     return ''
 
 
-def get_related_links(parser):
+def get_related_links(parser: Any) -> str:
     """Take the link in the 'Related links' onglet of metal-archives"""
     related_links_tag = parser.find('a', {'title': 'Related links'})
     if related_links_tag:
@@ -90,7 +91,7 @@ def get_related_links(parser):
     return ''
 
 
-def get_music_link(html):
+def get_music_link(html: str) -> List[str]:
     """Extract links to music websites"""
     parser = BeautifulSoup(html, 'lxml')
     a_tags = parser.findAll(pred_music_link)
@@ -100,7 +101,7 @@ def get_music_link(html):
     return []
 
 
-def chose_link(args, list_link):
+def chose_link(args: Any, list_link: List[str]) -> str:
     """Find the most interesting musical link"""
     for site in args.website:
         for link in list_link:
@@ -112,16 +113,18 @@ def chose_link(args, list_link):
     return ''
 
 
-def get_key_youtube(html):
-    """Get the key of the first vband_ido in the result page."""
+def get_key_youtube(html: str) -> str:
+    """Get the key of the first video in the result page."""
     parser = BeautifulSoup(html, 'lxml')
     script_content = parser.findAll('script', text=PATTERN_YT_JSON_VIDEO_DATA)
     script_content = script_content[0]
     for yt_key in re.finditer(r'watch\?v=(.{11})",', script_content.text):
         return yt_key.group(1)
+    return ''
 
 
-def request_youtube(args, band_name, band_country, last_disco):
+def request_youtube(args: Any, band_name: str, band_country: str,
+                    last_disco: str) -> str:
     """Make a request to Youtube and return the first link."""
     if last_disco:
         query = f'"{band_name} - {last_disco}" "{band_country}"'
@@ -137,7 +140,8 @@ def request_youtube(args, band_name, band_country, last_disco):
     return ''
 
 
-def only_youtube(args, band_name, band_id, band_country):
+def only_youtube(args: Any, band_name: str, band_id: str,
+                 band_country: str) -> str:
     """Search band last album/ep/demo/... on YouTube"""
     last_disco = get_last_discography(args, band_id)
     if last_disco:
@@ -149,7 +153,8 @@ def only_youtube(args, band_name, band_id, band_country):
     return ''
 
 
-def search_music(args, band_name, band_id, band_country, parser):
+def search_music(args: Any, band_name: str, band_id: str, band_country: str,
+                 parser) -> str:
     """
     Search band's music via the 'Related links'
     of metal-archives or on YouTube
@@ -170,7 +175,7 @@ def search_music(args, band_name, band_id, band_country, parser):
     return only_youtube(args, band_name, band_id, band_country)
 
 
-def find_band(args):
+def find_band(args: Any) -> str:
     """Find url for one band and display it."""
     content = get_html_content(args, URL_RANDOM, "Cannot get a random band")
     if content:
@@ -188,7 +193,7 @@ def find_band(args):
     return ''
 
 
-def main(args):
+def main(args) -> None:
     """TODO"""
     for _ in range(args.number):
         link = find_band(args)
