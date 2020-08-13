@@ -5,13 +5,10 @@ Python script which randomly select a band from metal-archives.com
 and search links to the music (i.e., on bandcamp or YouTube).
 """
 
-# TODO: Pass args namespace as parameters
-# TODO: Add band's country to improve YouTube results accuracy
-
 import re
 import sys
-import urllib.parse
 import webbrowser
+import urllib.parse
 from typing import List, Any
 
 from bs4 import BeautifulSoup  # type: ignore
